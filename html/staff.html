@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+  <link rel="stylesheet" href="../style.css">
+</head>
+<body>
+<div id="app" style="padding:20px">
+  <div class="search-box">
+    <input v-model="keywords" placeholder="姓名/部门">
+    <button class="btn" @click="getUserList">搜索</button>
+    <button class="btn primary" @click="openAddUser">新增</button>
+    <button class="btn success" @click="exportUser">导出Excel</button>
+  </div>
+
+  <div class="table-box">
+    <table>
+      <thead>
+        <tr><th>ID</th><th>姓名</th><th>部门</th><th>职位</th><th>状态</th><th>操作</th></tr>
+      </thead>
+      <tbody>
+        <tr v-for="item in userList" :key="item.id">
+          <td>{{ item.id }}</td>
+          <td>{{ item.name }}</td>
+          <td>{{ item.dept }}</td>
+          <td>{{ item.job }}</td>
+          <td>
+            <span :class="['tag', item.status ? 'normal' : 'stop']">
+              {{ item.status ? '正常' : '禁用' }}
+            </span>
+          </td>
+          <td>
+            <button class="btn mini primary" @click="openEditUser(item)">编辑</button>
+            <button class="btn mini red" @click="delUser(item.id)">删除</button>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="modal" v-show="showModal">
+    <div class="modal-box">
+      <div class="modal-title">{{ userForm.id ? '编辑' : '新增' }}</div>
+      <div class="modal-body">
+        <div class="form-item"><label>姓名</label><input v-model="userForm.name"></div>
+        <div class="form-item"><label>部门</label><input v-model="userForm.dept"></div>
+        <div class="form-item"><label>职位</label><input v-model="userForm.job"></div>
+        <div class="form-item">
+          <label>状态</label>
+          <select v-model="userForm.status" style="width:100%;padding:10px;border-radius:6px;border:1px solid #ddd;">
+            <option :value="1">正常</option>
+            <option :value="0">禁用</option>
+          </select>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button @click="showModal=false">取消</button>
+        <button class="primary" @click="saveUser">保存</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const { createApp } = Vue
+createApp({
+  data() {
+    return {
+      keywords: '',
+      userList: [],
+      showModal: false,
+      userForm: { id: '', name: '', dept: '', job: '', status: 1 }
+    }
+  },
+  mounted() {
+    this.getUserList()
+  },
+  methods: {
+    getUserList() {
+      this.userList = [
+        { id: 1001, name: '张三', dept: '技术部', job: '前端开发', status: 1 },
+        { id: 1002, name: '李四', dept: '人事部', job: '招聘', status: 1 },
+        { id: 1003, name: '王五', dept: '市场部', job: '销售', status: 0 }
+      ]
+    },
+    openAddUser() {
+      this.userForm = { id: '', name: '', dept: '', job: '', status: 1 }
+      this.showModal = true
+    },
+    openEditUser(row) {
+      this.userForm = { ...row }
+      this.showModal = true
+    },
+    saveUser() {
+      if (!this.userForm.name) return alert('请输入姓名')
+      if (!this.userForm.id) {
+        this.userForm.id = Date.now()
+        this.userList.push({ ...this.userForm })
+      } else {
+        const i = this.userList.findIndex(x => x.id === this.userForm.id)
+        this.userList[i] = { ...this.userForm }
+      }
+      this.showModal = false
+    },
+    delUser(id) {
+      if (confirm('确定删除？')) {
+        this.userList = this.userList.filter(x => x.id !== id)
+      }
+    },
+    exportUser() {
+      const data = [['ID','姓名','部门','职位','状态']]
+      this.userList.forEach(i=>{
+        data.push([i.id,i.name,i.dept,i.job,i.status?'正常':'禁用'])
+      })
+      const ws = XLSX.utils.aoa_to_sheet(data)
+      const wb = XLSX.utils.book_new()
+      XLSX.utils.book_append_sheet(wb,ws,'员工')
+      XLSX.writeFile(wb,'员工列表.xlsx')
+    }
+  }
+}).mount('#app')
+</script>
+</body>
+</html>
