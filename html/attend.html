@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+  <link rel="stylesheet" href="../style.css">
+</head>
+<body style="padding:20px">
+<div id="app">
+
+  <div class="search-box">
+    <input v-model="kw" placeholder="姓名">
+    <button class="btn" @click="getList">搜索</button>
+    <button class="btn primary" @click="openAdd()">新增</button>
+    <button class="btn success" @click="exportData">导出Excel</button>
+  </div>
+
+  <div class="table-box">
+    <table>
+      <tr>
+        <th>姓名</th>
+        <th>日期</th>
+        <th>上班</th>
+        <th>下班</th>
+        <th>工作时长</th>
+        <th>状态</th>
+        <th>操作</th>
+      </tr>
+      <tr v-for="item in list" :key="item.id">
+        <td>{{ item.name }}</td>
+        <td>{{ item.date }}</td>
+        <td>{{ item.in }}</td>
+        <td>{{ item.out }}</td>
+        <td>{{ workHour(item.in, item.out) }}</td>
+        <td>{{ item.status==1 ? '正常' : '迟到' }}</td>
+        <td>
+          <button class="btn mini primary" @click="openEdit(item)">编辑</button>
+        </td>
+      </tr>
+    </table>
+  </div>
+
+  <!-- 弹窗 -->
+  <div class="modal" v-show="showModal">
+    <div class="modal-box">
+      <div class="modal-title">{{ form.id ? '编辑考勤' : '新增考勤' }}</div>
+      <div class="modal-body">
+        <div class="form-item">
+          <label>姓名</label>
+          <input v-model="form.name" placeholder="请输入姓名">
+        </div>
+        <div class="form-item">
+          <label>日期</label>
+          <input v-model="form.date" type="date">
+        </div>
+        <div class="form-item">
+          <label>上班时间</label>
+          <input v-model="form.in" placeholder="如：09:00" @input="autoCheckStatus">
+        </div>
+        <div class="form-item">
+          <label>下班时间</label>
+          <input v-model="form.out" placeholder="如：18:00">
+        </div>
+
+        <!-- 状态：只显示，不能改 -->
+        <div class="form-item">
+          <label>状态</label>
+          <input type="text" disabled :value="form.status==1?'正常':'迟到'" style="background:#f5f7fa">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button @click="showModal=false">取消</button>
+        <button class="primary" @click="save">保存</button>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+const { createApp } = Vue
+createApp({
+  data() {
+    return {
+      kw: '',
+      list: [],
+      showModal: false,
+      form: { id: '', name: '', date: '', in: '09:00', out: '18:00', status: 1 }
+    }
+  },
+  mounted() {
+    this.getList()
+  },
+  methods: {
+    getList() {
+      this.list = [
+        { id: 1, name: '张三', date: '2025-12-26', in: '09:00', out: '18:00', status:1 },
+        { id: 2, name: '李四', date: '2025-12-26', in: '09:30', out: '18:00', status:0 }
+      ]
+    },
+    workHour(start, end) {
+      if (!start || !end) return '0.0h'
+      let t1 = start.split(':')
+      let t2 = end.split(':')
+      let h1 = Number(t1[0]) + Number(t1[1])/60
+      let h2 = Number(t2[0]) + Number(t2[1])/60
+      let hour = h2 - h1
+      return hour.toFixed(1) + 'h'
+    },
+
+    // 🔥 自动判断迟到（上班>09:00 → 迟到）
+    autoCheckStatus() {
+      let inTime = this.form.in
+      if (!inTime) return
+      let [h, m] = inTime.split(':').map(Number)
+      let total = h * 60 + m
+      if (total > 9 * 60) {
+        this.form.status = 0 // 迟到
+      } else {
+        this.form.status = 1 // 正常
+      }
+    },
+
+    openAdd() {
+      this.form = { id: '', name: '', date: '', in: '09:00', out: '18:00', status:1 }
+      this.showModal = true
+    },
+    openEdit(row) {
+      this.form = { ...row }
+      this.showModal = true
+    },
+    save() {
+      if (!this.form.name || !this.form.date || !this.form.in || !this.form.out) {
+        alert('请填写完整')
+        return
+      }
+
+      // 🔥 保存时再次强制校验状态（编辑也会自动刷新）
+      this.autoCheckStatus()
+
+      if (this.form.id) {
+        let index = this.list.findIndex(x => x.id === this.form.id)
+        this.list[index] = { ...this.form }
+      } else {
+        this.form.id = Date.now()
+        this.list.push({ ...this.form })
+      }
+      this.showModal = false
+    },
+
+    exportData() {
+      const data = [['姓名','日期','上班','下班','工作时长','状态']]
+      this.list.forEach(i=>{
+        data.push([i.name,i.date,i.in,i.out,this.workHour(i.in,i.out),i.status==1?'正常':'迟到'])
+      })
+      const ws = XLSX.utils.aoa_to_sheet(data)
+      const wb = XLSX.utils.book_new()
+      XLSX.utils.book_append_sheet(wb,ws,'考勤')
+      XLSX.writeFile(wb,'考勤记录.xlsx')
+    }
+  }
+}).mount('#app')
+</script>
+</body>
+</html>
